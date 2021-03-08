@@ -14,9 +14,10 @@ module.exports = class DatabaseBackup {
         if(typeof time !== "number") time = 60;
         this.devTime = devTime;
         this.time = time * 60000;
+        /** * @private */
+        this.shouldInterval = interval;
         this.interval = null;
         this.webhook = webhook.replace(new RegExp(WEBHOOK, "gi"), "").split("/");
-        if(interval && !this.interval) this.runInterval();
     };
     
     /** * @private */
@@ -45,6 +46,7 @@ module.exports = class DatabaseBackup {
     async run(databases = {  }, custom = { username: "Database Backup System", avatarURL: "https://cdn.discordapp.com/emojis/818562151404011560.png" }){
         if(typeof databases !== "object") return Promise.reject(`You didn't provide an object for the databases`);
         if(Object.keys(databases).length === 0) return Promise.reject(`You didn't provide any database objects`);
+        if(this.shouldInterval && !this.interval) this.runInterval(databases, custom);
         let hook = new Discord.WebhookClient(this.id, this.token),
             files = [],
             { username, avatarURL } = custom,
@@ -86,8 +88,9 @@ module.exports = class DatabaseBackup {
      * @private
      * @returns {boolean}
      */
-    runInterval(){
-        this.interval = setInterval(() => this.run(), this.time);
+    runInterval(databases = {}, custom = {}){
+        if(this.interval) clearInterval(this.interval);
+        this.interval = setInterval(() => this.run(databases, custom), this.time);
         return true;
     };
 };
