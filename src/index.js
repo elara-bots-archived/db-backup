@@ -1,18 +1,20 @@
-const [ Discord, fs, WEBHOOK ] = [ require("discord.js"), require("fs"), /http(s)?:\/\/(www.|ptb.|canary.)?discord(app)?.com\/api\/(v[0-9]*|webhooks)\// ];
+const [ Discord, fs, WEBHOOK, defDevTime ] = [ require("discord.js"), require("fs"), /http(s)?:\/\/(www.|ptb.|canary.)?discord(app)?.com\/api\/(v[0-9]*|webhooks)\//, "America/Los_Angeles" ];
 
 module.exports = class DatabaseBackup {
     /**
      * @param {string} [webhook] - The webhook URL to backup the database(s) to
-     * @param {number} [?time=60] - Minutes to wait until doing the next backup round.
-     * @param {boolean} [?interval=true] - If you want the interval to run, it's enabled by default 
-     * @param {string} [?devTime=""] - The timeZone for you. 
+     * @param {Object} [extra]
+     * @param {number} [extra.time=60] - Minutes to wait until doing the next backup round.
+     * @param {boolean} [extra.interval=true] - If you want the interval to run, it's enabled by default.
+     * @param {string} [extra.devTime=""] - The timeZone for you. 
      */
-    constructor(webhook = "", time = 60, interval = true, devTime = "America/Los_Angeles"){
+    constructor(webhook = "", extra = { time: 60, interval: true, devTime: defDevTime }){
+        let { time, interval, devTime } = extra;
         if(!webhook || typeof webhook !== "string") throw new Error(`You need to provide a Discord webhook URL!`);
         if(!webhook.match(WEBHOOK)) throw new Error(`You didn't provide a valid Discord URL!`)
         if(typeof interval !== "boolean") interval = true;
         if(typeof time !== "number") time = 60;
-        this.devTime = devTime;
+        this.devTime = devTime ?? defDevTime;
         this.time = time * 60000;
         /** * @private */
         this.shouldInterval = interval;
@@ -50,7 +52,7 @@ module.exports = class DatabaseBackup {
         let hook = new Discord.WebhookClient(this.id, this.token),
             files = [],
             { username, avatarURL } = custom,
-            time = () => new Date().toLocaleString('en-us', { timeZone: this.devTime ?? "America/Los_Angeles" }),
+            time = () => new Date().toLocaleString('en-us', { timeZone: this.devTime }),
             log = (...args) => console.log(`[${time()}]:`, ...args);
 
         for await (const list of Object.keys(databases)) {
@@ -71,7 +73,7 @@ module.exports = class DatabaseBackup {
             if(typeof s === "string") await fs.unlink(s, err => err ? console.log(err) : null);
         };
 
-        return log(`Database backup taken`)
+        return log(`Database backup taken${this.shouldInterval ? `, next run in: ${require("ms")(this.time, { long: true })}` : ``}`)
     };
     
     /**
