@@ -66,8 +66,8 @@ module.exports = class DatabaseBackup {
             if(!databases[list]) continue;
             let db = await databases[list].find();
             if(!db || db.length === 0) continue;
-            await fs.writeFileSync(`./json/${list}.json`, JSON.stringify(db, undefined, 2), err => err ? console.log(err) : null);
-            files.push(`./json/${list}.json`);
+            await fs.writeFileSync(`${__dirname}/json/${list}.json`, JSON.stringify(db, undefined, 2), err => err ? console.log(err) : null);
+            files.push(`${__dirname}/json/${list}.json`);
             continue;
         };
         if(files.length === 0) {
@@ -77,7 +77,7 @@ module.exports = class DatabaseBackup {
 
         await hook.send(null, { files, username, avatarURL,
             embeds: [ { title: "Database backup", color: 0xFF000, footer: { text: `Taken at • ${time()}` } } ],
-        }).catch(() => null);
+        }).catch((err) => log(err));
         
         for (const s of files) {
             if(typeof s === "string") await fs.unlink(s, err => err ? console.log(err) : null);
