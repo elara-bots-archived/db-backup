@@ -7,17 +7,24 @@ module.exports = class DatabaseBackup {
      * @param {number} [extra.time=60] - Minutes to wait until doing the next backup round.
      * @param {boolean} [extra.interval=true] - If you want the interval to run, it's enabled by default.
      * @param {string} [extra.devTime=""] - The timeZone for you. 
+     * @param {boolean} [extra.debug=false] - If you want the "Database backup taken." console log
      */
-    constructor(webhook = "", extra = { time: 60, interval: true, devTime: defDevTime }){
-        let { time, interval, devTime } = extra;
+    constructor(webhook = "", extra = { time: 60, interval: true, devTime: defDevTime, debug: false }){
+        let { time, interval, devTime, debug } = extra;
         if(!webhook || typeof webhook !== "string") throw new Error(`You need to provide a Discord webhook URL!`);
         if(!webhook.match(WEBHOOK)) throw new Error(`You didn't provide a valid Discord URL!`)
         if(typeof interval !== "boolean") interval = true;
+        if(typeof debug !== "boolean") debug = false;
         if(typeof time !== "number") time = 60;
         this.devTime = devTime ?? defDevTime;
         this.time = time * 60000;
+        
+        /** * @private */
+        this.debug = debug ?? false
+
         /** * @private */
         this.shouldInterval = interval;
+
         this.interval = null;
         this.webhook = webhook.replace(new RegExp(WEBHOOK, "gi"), "").split("/");
     };
@@ -63,7 +70,10 @@ module.exports = class DatabaseBackup {
             files.push(`./json/${list}.json`);
             continue;
         };
-        if(files.length === 0) return log(`No files to save?`);
+        if(files.length === 0) {
+            if(this.debug) log(`No files to save?`);
+            return this;
+        }
 
         await hook.send(null, { files, username, avatarURL,
             embeds: [ { title: "Database backup", color: 0xFF000, footer: { text: `Taken at • ${time()}` } } ],
@@ -73,7 +83,8 @@ module.exports = class DatabaseBackup {
             if(typeof s === "string") await fs.unlink(s, err => err ? console.log(err) : null);
         };
 
-        return log(`Database backup taken${this.shouldInterval ? `, next run in: ${require("ms")(this.time, { long: true })}` : ``}`)
+        if(this.debug) log(`Database backup taken${this.shouldInterval ? `, next run in: ${require("ms")(this.time, { long: true })}` : ``}`)
+        return this;
     };
     
     /**
