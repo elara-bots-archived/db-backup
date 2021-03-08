@@ -62,7 +62,7 @@ module.exports = class DatabaseBackup {
         if(files.length === 0) return log(`No files to save?`);
 
         await hook.send(null, { files, username, avatarURL,
-            embeds: [ { title: "Database backup", description: `Taken at: \`${time()}\``, color: 0xFF000, timestamp: new Date() } ],
+            embeds: [ { title: "Database backup", color: 0xFF000, footer: { text: `Taken at • ${time()}` } } ],
         }).catch(() => null);
         
         for (const s of files) {
