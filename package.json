@@ -1,0 +1,15 @@
+{
+  "name": "db-backup",
+  "version": "1.0.0",
+  "description": "Database backup to a Discord channel (mongodb only)",
+  "main": "./src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "SUPERCHIEFYT (Elara-Discord-Bots, Elara-Services)",
+  "license": "MIT",
+  "peerDependencies": {
+    "discord.js": "^12.x",
+    "mongoose": "^5.11.15"
+  }
+}
