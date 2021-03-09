@@ -5,7 +5,46 @@ const [ Discord, fs, WEBHOOK, defDevTime ] = [
     "America/Los_Angeles"
 ];
 
-/**
+module.exports = class DatabaseBackup {
+    /**
+     * @param {string} [webhook] - The webhook URL to backup the database(s) to
+     * @param {Object} [extra]
+     * @param {number} [extra.time=60] - Minutes to wait until doing the next backup round.
+     * @param {boolean} [extra.interval=true] - If you want the interval to run, it's enabled by default.
+     * @param {string} [extra.devTime=""] - The timeZone for you. 
+     * @param {boolean} [extra.debug=false] - If you want the "Database backup taken." console log
+     */
+    constructor(webhook = "", extra = { time: 60, interval: true, devTime: defDevTime, debug: false }){
+        let { time, interval, devTime, debug } = extra;
+        if(!webhook || typeof webhook !== "string") throw new Error(`You need to provide a Discord webhook URL!`);
+        if(!webhook.match(WEBHOOK)) throw new Error(`You didn't provide a valid Discord URL!`)
+        if(typeof interval !== "boolean") interval = true;
+        if(typeof debug !== "boolean") debug = false;
+        if(typeof time !== "number") time = 60;
+
+        this.devTime = devTime || defDevTime;
+        this.time = time * 60000;
+        this.interval = null;
+
+        /** * @private */
+        this.debug = debug
+
+        /** * @private */
+        this.shouldInterval = interval;
+
+        /** * @private */
+        this.webhook = webhook.replace(new RegExp(WEBHOOK, "gi"), "").split("/");
+    };
+    /** * @private */
+    get id(){
+        return this.webhook[0];
+    };
+    
+    /** * @private */
+    get token(){
+        return this.webhook[1];
+    };
+    /**
  * @typedef {Object} Fields
  * @property {string} [name=""]
  * @property {string} [value=""]
@@ -32,55 +71,13 @@ const [ Discord, fs, WEBHOOK, defDevTime ] = [
  * @property {Object} [image]
  * @property {string} [image.url]
  */
-
-module.exports = class DatabaseBackup {
-    /**
-     * @param {string} [webhook] - The webhook URL to backup the database(s) to
-     * @param {Object} [extra]
-     * @param {number} [extra.time=60] - Minutes to wait until doing the next backup round.
-     * @param {boolean} [extra.interval=true] - If you want the interval to run, it's enabled by default.
-     * @param {string} [extra.devTime=""] - The timeZone for you. 
-     * @param {boolean} [extra.debug=false] - If you want the "Database backup taken." console log
-     */
-    constructor(webhook = "", extra = { time: 60, interval: true, devTime: defDevTime, debug: false }){
-        let { time, interval, devTime, debug } = extra;
-        if(!webhook || typeof webhook !== "string") throw new Error(`You need to provide a Discord webhook URL!`);
-        if(!webhook.match(WEBHOOK)) throw new Error(`You didn't provide a valid Discord URL!`)
-        if(typeof interval !== "boolean") interval = true;
-        if(typeof debug !== "boolean") debug = false;
-        if(typeof time !== "number") time = 60;
-        
-        this.devTime = devTime || defDevTime;
-        this.time = time * 60000;
-        this.interval = null;
-
-        /** * @private */
-        this.debug = debug
-
-        /** * @private */
-        this.shouldInterval = interval;
-
-        /** * @private */
-        this.webhook = webhook.replace(new RegExp(WEBHOOK, "gi"), "").split("/");
-    };
-    
-    /** * @private */
-    get id(){
-        return this.webhook[0];
-    };
-    
-    /** * @private */
-    get token(){
-        return this.webhook[1];
-    };
-
     /**
      * @description Run the database backup, you need to provide the object with the database objects
      * @param {object} databases 
      * @param {Object} [?custom]
      * @param {string} [custom.username] - The username for the webhook
      * @param {string} [custom.avatarURL] - The avatar for the webhook
-     * @param {import("db-backup").Embed[]} [embeds] - The embeds to send with the files. (not required)
+     * @param {Embed[]} [embeds] - The embeds to send with the files. (not required)
      * @example
      * ```js
      * const Database = new (require("db-backup"))("https://discord.com/api/webhooks/.../...")
@@ -96,13 +93,41 @@ module.exports = class DatabaseBackup {
             new Discord.WebhookClient(this.id, this.token),
             [],
             custom,
-            [ { title: "Database backup", color: 0xFF000, footer: { text: `Taken at • ${this.date()}` } } ]
+            [ { title: "Database backup", color: 0xFF000, footer: { text: `Taken at • %TIME%` } } ]
         ]
-        
+
         if(!embeds || !Array.isArray(embeds)) embeds = defEmbeds;
         if(Array.isArray(embeds) && embeds.length === 0) embeds = defEmbeds;
+        embeds = embeds.map(embed => {
+            const replace = (string="") => {
+                string
+                .replace(/%TIME%/gi, this.time());
+                if(string.match(/%NEXT_RUN(_DURATION)?%/gi)){
+                try {
+                    require("moment-duration-format");
+                    const moment = require("moment"),
+                          next = moment().add(this.time, "minutes").toDate();
+                    
+                    string = string
+                    .replace(/%NEXT_RUN_DURATION%/gi, moment.duration(new Date().getTime() - next.getTime())).format("d[d], h[h], m[m], s[s]")
+                    .replace(/%NEXT_RUN%/gi, this.date(next));
+
+                }catch{ }
+                }
+                return string;
+            }
+            if(embed.title) embed.title = replace(embed.title)
+            if(embed.description) embed.description = replace(embed.description)
+            if(embed.author && embed.author.name) embed.author.name = replace(embed.author.name)
+            if(embed.footer && embed.footer.text) embed.footer.text = replace(embed.footer.text);
+            embed.fields = embed.fields.map(c => {
+                if(c.name) c.name = replace(c.name);
+                if(c.value) c.value = replace(c.value);
+                return c;
+            });
+            return embed;
+        })
         if(this.shouldInterval && !this.interval) this.runInterval(databases, custom, embeds);
-        
         for await (const list of Object.keys(databases)) {
             if(!databases[list]) continue;
             let db = await databases[list].find();
@@ -143,8 +168,8 @@ module.exports = class DatabaseBackup {
     };
 
     /** * @private */
-    date() {
-        return new Date().toLocaleString('en-US', { timeZone: this.devTime });
+    date(time = null) {
+        return new Date(time ? time : new Date()).toLocaleString('en-US', { timeZone: this.devTime });
     };
 
     /** * @private  */
