@@ -49,16 +49,18 @@ module.exports = class DatabaseBackup {
         if(typeof interval !== "boolean") interval = true;
         if(typeof debug !== "boolean") debug = false;
         if(typeof time !== "number") time = 60;
+        
         this.devTime = devTime || defDevTime;
         this.time = time * 60000;
-        
+        this.interval = null;
+
         /** * @private */
         this.debug = debug
 
         /** * @private */
         this.shouldInterval = interval;
 
-        this.interval = null;
+        /** * @private */
         this.webhook = webhook.replace(new RegExp(WEBHOOK, "gi"), "").split("/");
     };
     
