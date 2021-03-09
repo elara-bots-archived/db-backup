@@ -100,27 +100,22 @@ module.exports = class DatabaseBackup {
         if(Array.isArray(embeds) && embeds.length === 0) embeds = defEmbeds;
         embeds = embeds.map(embed => {
             const replace = (string="") => {
-                string
-                .replace(/%TIME%/gi, this.date());
-                if(string.match(/%NEXT_RUN(_DURATION)?%/gi)){
+                string = string.replace(/%TIME%/gi, this.date());
                 try {
                     require("moment-duration-format");
                     const moment = require("moment"),
-                          next = moment().add(this.time, "minutes").toDate();
-                    
+                          next = moment().add(this.time / 60000, "minutes").toDate();
                     string = string
-                    .replace(/%NEXT_RUN_DURATION%/gi, moment.duration(new Date().getTime() - next.getTime())).format("d[d], h[h], m[m], s[s]")
+                    .replace(/%NEXT_RUN_DURATION%/gi, moment.duration(new Date().getTime() - next.getTime()).format("d[d], h[h], m[m], s[s]"))
                     .replace(/%NEXT_RUN%/gi, this.date(next));
-
                 }catch{ }
-                }
                 return string;
             }
             if(embed.title) embed.title = replace(embed.title)
             if(embed.description) embed.description = replace(embed.description)
             if(embed.author && embed.author.name) embed.author.name = replace(embed.author.name)
             if(embed.footer && embed.footer.text) embed.footer.text = replace(embed.footer.text);
-            embed.fields = embed.fields.map(c => {
+            if(embed.fields && Array.isArray(embed.fields)) embed.fields = embed.fields.map(c => {
                 if(c.name) c.name = replace(c.name);
                 if(c.value) c.value = replace(c.value);
                 return c;
