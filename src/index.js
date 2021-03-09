@@ -86,58 +86,67 @@ module.exports = class DatabaseBackup {
      * ```
      * @returns {Promise<void>}
      */
-    async run(databases = {  }, custom = { username: "Database Backup System", avatarURL: "https://cdn.discordapp.com/emojis/818562151404011560.png"}, embeds = []){
+    async run(databases = {}, custom = { username: "Database Backup System", avatarURL: "https://cdn.discordapp.com/emojis/818562151404011560.png"}, embeds = []){
         if(typeof databases !== "object") return Promise.reject(`You didn't provide an object for the databases`);
         if(Object.keys(databases).length === 0) return Promise.reject(`You didn't provide any database objects`);
-        let hook = new Discord.WebhookClient(this.id, this.token),
-            files = [],
-            { username, avatarURL } = custom,
-            time = () => new Date().toLocaleString('en-us', { timeZone: this.devTime }),
-            log = (...args) => console.log(`[${time()}]:`, ...args),
-            defEmbeds = [ { title: "Database backup", color: 0xFF000, footer: { text: `Taken at • ${time()}` } } ]
+        
+        let [ hook, files, { username, avatarURL }, defEmbeds ] = [
+            new Discord.WebhookClient(this.id, this.token),
+            [],
+            custom,
+            [ { title: "Database backup", color: 0xFF000, footer: { text: `Taken at • ${this.date()}` } } ]
+        ]
         
         if(!embeds || !Array.isArray(embeds)) embeds = defEmbeds;
+        if(Array.isArray(embeds) && embeds.length === 0) embeds = defEmbeds;
         if(this.shouldInterval && !this.interval) this.runInterval(databases, custom, embeds);
         
         for await (const list of Object.keys(databases)) {
             if(!databases[list]) continue;
             let db = await databases[list].find();
             if(!db || db.length === 0) continue;
-            await fs.writeFileSync(`${__dirname}/json/${list}.json`, JSON.stringify(db, undefined, 2), err => err ? console.log(err) : null);
+            await fs.writeFileSync(`${__dirname}/json/${list}.json`, JSON.stringify(db, undefined, 2), err => err ? this.console(err) : null);
             files.push(`${__dirname}/json/${list}.json`);
             continue;
         };
         if(files.length === 0) {
-            if(this.debug) log(`No files to save?`);
+            if(this.debug) this.console(`No files to save?`);
             return this;
         };
-        await hook.send(null, { files, username, avatarURL, embeds }).catch((err) => log(`[DATABASE:BACKUP:ERROR]`, err));
+        await hook.send(null, { files, username, avatarURL, embeds }).catch((err) => this.console(`[DATABASE:BACKUP:ERROR]`, err));
         
         for (const s of files) {
-            if(typeof s === "string") await fs.unlink(s, err => err ? console.log(err) : null);
+            if(typeof s === "string") await fs.unlink(s, err => err ? this.console(err) : null);
         };
 
-        if(this.debug) log(`Database backup taken${this.shouldInterval ? `, next run in: ${require("ms")(this.time, { long: true })}` : ``}`)
+        if(this.debug) this.console(`Database backup taken${this.shouldInterval ? `, next run in: ${require("ms")(this.time, { long: true })}` : ``}`)
         return this;
     };
     
-    /**
-     * @returns {boolean}
-     */
-    
+    /** * @returns {boolean} */
     clear(){
         if(!this.interval) return false;
         clearInterval(this.interval);
         return true;
-    }
+    };
 
     /**
      * @private
      * @returns {boolean}
      */
-    runInterval(databases = {}, custom = {}, embeds){
+    runInterval(databases = {}, custom = {}, embeds = []){
         if(this.interval) clearInterval(this.interval);
         this.interval = setInterval(() => this.run(databases, custom, embeds), this.time);
         return true;
+    };
+
+    /** * @private */
+    date() {
+        return new Date().toLocaleString('en-US', { timeZone: this.devTime });
+    };
+
+    /** * @private  */
+    console(...args) {
+        return console.log(`[${this.date()}]:`, ...args);
     };
 };
