@@ -1,4 +1,37 @@
-const [ Discord, fs, WEBHOOK, defDevTime ] = [ require("discord.js"), require("fs"), /http(s)?:\/\/(www.|ptb.|canary.)?discord(app)?.com\/api\/(v[0-9]*|webhooks)\//, "America/Los_Angeles" ];
+const [ Discord, fs, WEBHOOK, defDevTime ] = [ 
+    require("discord.js"), 
+    require("fs"), 
+    /http(s)?:\/\/(www.|ptb.|canary.)?discord(app)?.com\/api\/(v[0-9]*|webhooks)\//, 
+    "America/Los_Angeles"
+];
+
+/**
+ * @typedef {Object} Fields
+ * @property {string} [name=""]
+ * @property {string} [value=""]
+ * @property {boolean} [inline=false]
+ */
+
+/**
+ * @typedef {Object} Embed
+ * @property {string} [title]
+ * @property {string} [description]
+ * @property {string|Date} [timestamp]
+ * @property {string} [url]
+ * @property {string|number} [color]
+ * @property {Fields[]} [fields]
+ * @property {Object} [author]
+ * @property {string} [author.name]
+ * @property {string} [author.icon_url]
+ * @property {string} [author.url]
+ * @property {Object} [footer]
+ * @property {string} [footer.text]
+ * @property {string} [footer.icon_url]
+ * @property {Object} [thumbnail]
+ * @property {string} [thumbnail.url]
+ * @property {Object} [image]
+ * @property {string} [image.url]
+ */
 
 module.exports = class DatabaseBackup {
     /**
@@ -45,6 +78,7 @@ module.exports = class DatabaseBackup {
      * @param {Object} [?custom]
      * @param {string} [custom.username] - The username for the webhook
      * @param {string} [custom.avatarURL] - The avatar for the webhook
+     * @param {import("db-backup").Embed[]} [embeds] - The embeds to send with the files. (not required)
      * @example
      * ```js
      * const Database = new (require("db-backup"))("https://discord.com/api/webhooks/.../...")
@@ -52,16 +86,19 @@ module.exports = class DatabaseBackup {
      * ```
      * @returns {Promise<void>}
      */
-    async run(databases = {  }, custom = { username: "Database Backup System", avatarURL: "https://cdn.discordapp.com/emojis/818562151404011560.png" }){
+    async run(databases = {  }, custom = { username: "Database Backup System", avatarURL: "https://cdn.discordapp.com/emojis/818562151404011560.png"}, embeds = []){
         if(typeof databases !== "object") return Promise.reject(`You didn't provide an object for the databases`);
         if(Object.keys(databases).length === 0) return Promise.reject(`You didn't provide any database objects`);
-        if(this.shouldInterval && !this.interval) this.runInterval(databases, custom);
         let hook = new Discord.WebhookClient(this.id, this.token),
             files = [],
             { username, avatarURL } = custom,
             time = () => new Date().toLocaleString('en-us', { timeZone: this.devTime }),
-            log = (...args) => console.log(`[${time()}]:`, ...args);
-
+            log = (...args) => console.log(`[${time()}]:`, ...args),
+            defEmbeds = [ { title: "Database backup", color: 0xFF000, footer: { text: `Taken at • ${time()}` } } ]
+        
+        if(!embeds || !Array.isArray(embeds)) embeds = defEmbeds;
+        if(this.shouldInterval && !this.interval) this.runInterval(databases, custom, embeds);
+        
         for await (const list of Object.keys(databases)) {
             if(!databases[list]) continue;
             let db = await databases[list].find();
@@ -73,11 +110,8 @@ module.exports = class DatabaseBackup {
         if(files.length === 0) {
             if(this.debug) log(`No files to save?`);
             return this;
-        }
-
-        await hook.send(null, { files, username, avatarURL,
-            embeds: [ { title: "Database backup", color: 0xFF000, footer: { text: `Taken at • ${time()}` } } ],
-        }).catch((err) => log(err));
+        };
+        await hook.send(null, { files, username, avatarURL, embeds }).catch((err) => log(`[DATABASE:BACKUP:ERROR]`, err));
         
         for (const s of files) {
             if(typeof s === "string") await fs.unlink(s, err => err ? console.log(err) : null);
@@ -101,9 +135,9 @@ module.exports = class DatabaseBackup {
      * @private
      * @returns {boolean}
      */
-    runInterval(databases = {}, custom = {}){
+    runInterval(databases = {}, custom = {}, embeds){
         if(this.interval) clearInterval(this.interval);
-        this.interval = setInterval(() => this.run(databases, custom), this.time);
+        this.interval = setInterval(() => this.run(databases, custom, embeds), this.time);
         return true;
     };
 };
