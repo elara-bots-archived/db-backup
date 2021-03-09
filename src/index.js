@@ -101,7 +101,7 @@ module.exports = class DatabaseBackup {
         embeds = embeds.map(embed => {
             const replace = (string="") => {
                 string
-                .replace(/%TIME%/gi, this.time());
+                .replace(/%TIME%/gi, this.date());
                 if(string.match(/%NEXT_RUN(_DURATION)?%/gi)){
                 try {
                     require("moment-duration-format");
