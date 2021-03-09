@@ -49,11 +49,11 @@ module.exports = class DatabaseBackup {
         if(typeof interval !== "boolean") interval = true;
         if(typeof debug !== "boolean") debug = false;
         if(typeof time !== "number") time = 60;
-        this.devTime = devTime ?? defDevTime;
+        this.devTime = devTime || defDevTime;
         this.time = time * 60000;
         
         /** * @private */
-        this.debug = debug ?? false
+        this.debug = debug
 
         /** * @private */
         this.shouldInterval = interval;
